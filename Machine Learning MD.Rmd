@@ -1,0 +1,102 @@
+#Background
+
+#Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible 
+#to collect a large amount of data about personal activity relatively inexpensively. 
+#These type of devices are part of the quantified self movement - a group of 
+#enthusiasts who take measurements about themselves regularly to improve their health,
+#to find patterns in their behavior, or because they are tech geeks. One thing that 
+#people regularly do is quantify how much of a particular activity they do, but they
+#rarely quantify how well they do it. In this project, my goal was to use data
+#from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. 
+#They were asked to perform barbell lifts correctly and incorrectly in 5 different ways
+
+
+#Data
+
+#The training data for this project:
+        
+       # https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+#The test data for the project:
+        
+       #https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+
+#Preprocessing
+
+library(caret)
+library(randomForest)
+library(e1071)
+
+data <- read.csv("pml-training.csv")
+colnames(data)
+dim(data)
+
+#Model creation
+set.seed(1102)
+train <- createDataPartition(y=data$classe,p=.8,list=F)
+training <- data[train,]
+dim(training)
+testing <- data[-train,]
+dim(testing)
+
+#exclude non-unique data
+Cl <- grep("name|timestamp|window|X", colnames(training), value=F) 
+trainingCl <- training[,-Cl]
+
+#Exclude variables with high (over 95%) missing data
+trainingCl[trainingCl==""] <- NA
+NArate <- apply(trainingCl, 2, function(x) sum(is.na(x)))/nrow(trainingCl)
+trainingCl <- trainingCl[!(NArate>0.95)]
+dim(trainingCl)
+
+preProc <- preProcess(trainingCl[,1:53],method="pca",pcaComp=53) 
+
+trainingPC <- predict(preProc,trainingCl[,1:53])
+
+modFitRF <- randomForest(trainingCl$classe ~ .,   data=trainingPC, do.trace=F)
+print(modFitRF) 
+importance(modFitRF)
+
+testingCl <- testing[,-Cl]
+testingCl[testingCl==""] <- NA
+NArate <- apply(testingCl, 2, function(x) sum(is.na(x)))/nrow(testingCl)
+testingCl <- testingCl[!(NArate>0.95)]
+testingPC <- predict(preProc,testingCl[,1:53])
+confusionMatrix(testingCl$classe,predict(modFitRF,testingPC))
+
+#20 case test set predictions
+testdata <- read.csv("pml-testing.csv")
+testdataCl <- testdata[,-Cl]
+testdataCl[testdataCl==""] <- NA
+NArate <- apply(testdataCl, 2, function(x) sum(is.na(x)))/nrow(testdataCl)
+testdataCl <- testdataCl[!(NArate>0.95)]
+testdataPC <- predict(preProc,testdataCl[,1:53])
+testdataCl$classe <- predict(modFitRF,testdataPC)
+
+#conclusion
+
+#The data set consisted of 19622 observations from the Human Activity Recognition
+#project.  15699 observartions were used in building the model, while 3923 were
+#used for validation. The dataset included 5 classes(sitting down, standing up, walking and sitting)
+# of 4 healthy subjects. 
+
+#The model achieved a 98% accuracy rate when used to evaluate the test data.  However,
+#the HAR project was originally proposed for elderly and weight loss programs.  This
+#model only applies to the 8 healthy subjects between the ages of 20-28, so it would not 
+#apply to other groups outside of this range.
+
+
+
+#Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H. 
+#Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements.
+#Proceedings of 21st Brazilian Symposium on Artificial Intelligence. Advances in 
+#Artificial Intelligence - SBIA 2012. In: Lecture Notes in Computer Science. , 
+#pp. 52-61. Curitiba, PR: Springer Berlin / Heidelberg, 2012. ISBN 978-3-642-34458-9. 
+#DOI: 10.1007/978-3-642-34459-6_6. 
+
+#Read more: http://groupware.les.inf.puc-rio.br/har#ixzz4wWiDJD7T
+
+
+
+
